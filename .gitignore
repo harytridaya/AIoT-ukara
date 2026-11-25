@@ -1,5 +1,10 @@
 node_modules/
-.config.*
-*.backup
+**/node_modules/
 *.log
+**/*.log
+.config.*
+**/.config.*
+*.backup
+**/*.backup
 .sessions.json
+**/.sessions.json
