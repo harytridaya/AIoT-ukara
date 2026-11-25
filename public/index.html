@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="id">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IoT Smart Monitoring</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">I</div>
+        <div><strong>IoT Monitor</strong><small>SMART AGRICULTURE</small></div>
+      </div>
+      <nav>
+        <a class="nav-link active" href="#overview">▦ <span>Overview</span></a>
+        <a class="nav-link" href="#history">◷ <span>Riwayat Data</span></a>
+        <a class="nav-link" href="#connection">⌁ <span>Koneksi</span></a>
+      </nav>
+      <div class="sidebar-bottom">
+        <span class="pulse-dot"></span>
+        <div><strong>Node-RED</strong><small>Backend service</small></div>
+      </div>
+    </aside>
+
+    <main class="main-content" id="overview">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">MONITORING PERANGKAT</p>
+          <h1>Dashboard IoT</h1>
+          <p class="subtitle">Pemantauan sensor DHT22 dan deteksi anomali berbasis Edge Impulse.</p>
+        </div>
+        <div class="topbar-right">
+          <span class="connection-pill" id="connectionBadge"><i></i> Menghubungkan...</span>
+          <span class="clock" id="currentTime">--:--:--</span>
+        </div>
+      </header>
+
+      <section class="source-control-bar">
+        <div class="source-control-info">
+          <span class="muted-label">SUMBER DATA</span>
+          <div class="source-status-text">
+            Mode: <strong id="sourceModeLabel" class="mode-badge-sim">Simulasi Inject</strong>
+          </div>
+        </div>
+        <div class="source-switch-wrapper">
+          <span class="switch-label" id="labelReal" title="Pilih data dari ESP32">📡 Real ESP32</span>
+          <label class="toggle-switch" title="Geser untuk memilih sumber data (ESP32 / Simulasi)">
+            <input type="checkbox" id="sourceToggle" checked>
+            <span class="slider"></span>
+          </label>
+          <span class="switch-label active" id="labelSim" title="Pilih data dari Simulasi Inject">🧪 Simulasi Inject</span>
+        </div>
+      </section>
+
+      <section class="device-strip">
+        <div><span class="muted-label">PERANGKAT</span><strong id="deviceId">Menunggu data...</strong></div>
+        <div><span class="muted-label">WAKTU DATA TERAKHIR</span><strong id="lastUpdate">Belum ada data</strong></div>
+        <div><span class="muted-label">TOPIK MQTT</span><strong id="mqttTopic">ukara/aiot/hary/weather</strong></div>
+      </section>
+
+      <section class="section-heading">
+        <div>
+          <h2>Ringkasan kondisi</h2>
+          <p>Nilai sensor terakhir yang diterima dari ESP32.</p>
+        </div>
+        <span class="live-label"><span class="pulse-dot"></span> LIVE</span>
+      </section>
+
+      <section class="metrics-grid">
+        <article class="metric-card">
+          <div class="metric-top"><span>Suhu</span><span class="metric-icon orange">°C</span></div>
+          <div class="metric-value" id="temperature">--.-<small>°C</small></div>
+          <div class="metric-foot">Sensor DHT22</div>
+        </article>
+        <article class="metric-card">
+          <div class="metric-top"><span>Kelembapan</span><span class="metric-icon blue">%</span></div>
+          <div class="metric-value" id="humidity">--<small>%</small></div>
+          <div class="metric-foot">Sensor DHT22</div>
+        </article>
+        <article class="metric-card">
+          <div class="metric-top"><span>AI Anomaly Score</span><span class="metric-icon purple">AI</span></div>
+          <div class="metric-value" id="aiScore">--</div>
+          <div class="metric-foot">Skor inferensi Edge Impulse</div>
+        </article>
+        <article class="metric-card status-card">
+          <div class="metric-top"><span>Status deteksi</span><span class="metric-icon green">✓</span></div>
+          <div class="status-value" id="anomalyStatus">Menunggu</div>
+          <div class="metric-foot" id="anomalyDetail">Belum ada hasil deteksi</div>
+        </article>
+      </section>
+
+      <section class="charts-grid">
+        <article class="panel chart-panel">
+          <div class="panel-heading">
+            <div>
+              <h3>Grafik suhu</h3>
+              <p>Perubahan suhu dari waktu ke waktu</p>
+            </div><span class="chart-unit">°C</span>
+          </div>
+          <div class="chart-wrap"><canvas id="temperatureChart"></canvas></div>
+        </article>
+        <article class="panel chart-panel">
+          <div class="panel-heading">
+            <div>
+              <h3>Grafik kelembapan</h3>
+              <p>Perubahan kelembapan dari waktu ke waktu</p>
+            </div><span class="chart-unit">%</span>
+          </div>
+          <div class="chart-wrap"><canvas id="humidityChart"></canvas></div>
+        </article>
+      </section>
+
+      <section class="panel history-panel" id="history">
+        <div class="panel-heading history-heading">
+          <div>
+            <h3>Riwayat pembacaan</h3>
+            <p>Data terbaru yang diterima Node-RED melalui MQTT.</p>
+          </div>
+          <button class="button-secondary" id="refreshButton">↻ Muat ulang</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>WAKTU</th>
+                <th>SUHU</th>
+                <th>KELEMBAPAN</th>
+                <th>RULE</th>
+                <th>AI SCORE</th>
+                <th>STATUS</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody">
+              <tr>
+                <td colspan="6" class="empty-state">Menunggu data dari ESP32...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel connection-panel" id="connection">
+        <div class="panel-heading">
+          <div>
+            <h3>Status koneksi</h3>
+            <p>Informasi jalur komunikasi sistem.</p>
+          </div>
+        </div>
+        <div class="connection-grid">
+          <div><span class="muted-label">MQTT BROKER</span><strong id="brokerAddress">broker.hivemq.com:1883</strong>
+          </div>
+          <div><span class="muted-label">BACKEND</span><strong>Node-RED · HTTP :1880</strong></div>
+          <div><span class="muted-label">API STATUS</span><strong id="apiStatus">Memeriksa...</strong></div>
+          <div><span class="muted-label">PEMBARUAN</span><strong>Polling setiap 3 detik</strong></div>
+        </div>
+      </section>
+      <footer>IoT Smart Monitoring <span>•</span> ESP32 · DHT22 · Edge Impulse · HiveMQ</footer>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+  <script src="app.js"></script>
+</body>
+
+</html>

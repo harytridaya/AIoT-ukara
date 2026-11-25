@@ -1,0 +1,9 @@
+{
+    "name": "iot-dashboard-nodered",
+    "description": "IoT Smart Monitoring Dashboard with Node-RED",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+        "start": "node-red -s settings.js -u . nodered-flow.json"
+    }
+}

@@ -1,0 +1,316 @@
+[
+    {
+        "id": "tab_iot_monitor",
+        "type": "tab",
+        "label": "IoT Smart Monitoring",
+        "disabled": false,
+        "info": "MQTT ingestion dan API dashboard"
+    },
+    {
+        "id": "b5d6a8f0c1e24301",
+        "type": "mqtt-broker",
+        "name": "HiveMQ",
+        "broker": "broker.hivemq.com",
+        "port": "1883",
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "mqtt_in_iot",
+        "type": "mqtt in",
+        "z": "tab_iot_monitor",
+        "name": "Data ESP32 DHT22",
+        "topic": "ukara/aiot/hary/#",
+        "qos": "0",
+        "datatype": "auto-detect",
+        "broker": "b5d6a8f0c1e24301",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 170,
+        "y": 100,
+        "wires": [
+            [
+                "json_parse_iot"
+            ]
+        ]
+    },
+    {
+        "id": "json_parse_iot",
+        "type": "json",
+        "z": "tab_iot_monitor",
+        "name": "Parse JSON",
+        "property": "payload",
+        "action": "",
+        "pretty": false,
+        "x": 370,
+        "y": 100,
+        "wires": [
+            [
+                "store_iot_data"
+            ]
+        ]
+    },
+    {
+        "id": "store_iot_data",
+        "type": "function",
+        "z": "tab_iot_monitor",
+        "name": "Simpan data & normalisasi",
+        "func": "// Normalisasi payload dari ESP32 atau Simulasi Inject.\nconst p = msg.payload || {};\nconst sourceMode = flow.get(\"source_mode\") || \"simulation\";\n\n// Deteksi apakah data berasal dari simulasi inject\nconst isSim = (p.device_id === \"ESP32-SIMULATOR\" || msg._source === \"simulation\");\n\n// Filter berdasarkan mode aktif dari slider dashboard\nif (sourceMode === \"esp\" && isSim) {\n    return null; // Abaikan simulasi saat mode Real ESP32 dipilih\n}\nif (sourceMode === \"simulation\" && !isSim) {\n    return null; // Abaikan data ESP saat mode Simulasi dipilih\n}\n\n// Variasi dinamis halus untuk data simulasi\nlet temp = Number(p.temperature ?? p.temp ?? p.suhu ?? p.t);\nlet hum = Number(p.humidity ?? p.hum ?? p.kelembapan ?? p.kelembaban ?? p.h);\nif (isSim && Number.isFinite(temp) && Number.isFinite(hum)) {\n    temp = Number((temp + (Math.random() * 0.8 - 0.4)).toFixed(1));\n    hum = Number((hum + (Math.random() * 1.6 - 0.8)).toFixed(1));\n}\n\nif (!isSim) {\n    node.warn(\"[MQTT ESP32 DITERIMA] Topik: \" + msg.topic + \" -> Suhu: \" + temp + \", Kelembapan: \" + hum);\n}\n\nconst row = {\n    device_id: isSim ? \"ESP32-SIMULATOR\" : (p.device_id ?? p.deviceId ?? \"esp32-hary\"),\n    timestamp: p.timestamp ?? p.time ?? new Date().toISOString(),\n    temperature: temp,\n    humidity: hum,\n    rule_anomaly: p.rule_anomaly ?? p.anomaly_rule ?? p.rule ?? \"normal\",\n    ai_score: Number(p.ai_score ?? p.anomaly_score ?? (isSim ? (Math.random() * 0.12).toFixed(3) : 0)),\n    status: p.status ?? p.anomaly_status ?? \"normal\",\n    source: isSim ? \"simulation\" : \"esp\"\n};\n\nif (!Number.isFinite(row.temperature) || !Number.isFinite(row.humidity)) {\n    node.warn(\"Payload tidak memiliki temperature/humidity numerik: \" + JSON.stringify(p));\n    return null;\n}\n\nlet history = flow.get(\"iot_history\") || [];\nhistory.unshift(row);\nhistory = history.slice(0, 100);\nflow.set(\"iot_history\", history);\nflow.set(\"iot_latest\", row);\nmsg.payload = row;\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 630,
+        "y": 100,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "http_status_in",
+        "type": "http in",
+        "z": "tab_iot_monitor",
+        "name": "API status",
+        "url": "/api/status",
+        "method": "get",
+        "upload": false,
+        "skipBodyParsing": false,
+        "swaggerDoc": "",
+        "x": 150,
+        "y": 220,
+        "wires": [
+            [
+                "get_status"
+            ]
+        ]
+    },
+    {
+        "id": "get_status",
+        "type": "function",
+        "z": "tab_iot_monitor",
+        "name": "Ambil data terakhir",
+        "func": "const latest = flow.get(\"iot_latest\") || null;\nconst mode = flow.get(\"source_mode\") || \"simulation\";\nmsg.statusCode = 200;\nmsg.headers = { \"Content-Type\": \"application/json; charset=utf-8\", \"Cache-Control\": \"no-store\" };\nmsg.payload = { latest, mode };\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 390,
+        "y": 220,
+        "wires": [
+            [
+                "http_status_response"
+            ]
+        ]
+    },
+    {
+        "id": "http_status_response",
+        "type": "http response",
+        "z": "tab_iot_monitor",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 630,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "http_history_in",
+        "type": "http in",
+        "z": "tab_iot_monitor",
+        "name": "API history",
+        "url": "/api/history",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 150,
+        "y": 300,
+        "wires": [
+            [
+                "get_history"
+            ]
+        ]
+    },
+    {
+        "id": "get_history",
+        "type": "function",
+        "z": "tab_iot_monitor",
+        "name": "Ambil riwayat",
+        "func": "msg.statusCode = 200;\nmsg.headers = { \"Content-Type\": \"application/json; charset=utf-8\", \"Cache-Control\": \"no-store\" };\nmsg.payload = flow.get(\"iot_history\") || [];\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 370,
+        "y": 300,
+        "wires": [
+            [
+                "http_history_response"
+            ]
+        ]
+    },
+    {
+        "id": "http_history_response",
+        "type": "http response",
+        "z": "tab_iot_monitor",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 620,
+        "y": 300,
+        "wires": []
+    },
+    {
+        "id": "http_mode_post_in",
+        "type": "http in",
+        "z": "tab_iot_monitor",
+        "name": "POST /api/mode",
+        "url": "/api/mode",
+        "method": "post",
+        "upload": false,
+        "skipBodyParsing": false,
+        "swaggerDoc": "",
+        "x": 150,
+        "y": 380,
+        "wires": [
+            [
+                "func_set_mode"
+            ]
+        ]
+    },
+    {
+        "id": "func_set_mode",
+        "type": "function",
+        "z": "tab_iot_monitor",
+        "name": "Set mode data",
+        "func": "const body = msg.payload || {};\nconst newMode = (body.mode === \"esp\") ? \"esp\" : \"simulation\";\nflow.set(\"source_mode\", newMode);\nmsg.statusCode = 200;\nmsg.headers = { \"Content-Type\": \"application/json; charset=utf-8\", \"Cache-Control\": \"no-store\" };\nmsg.payload = { success: true, mode: newMode };\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 370,
+        "y": 380,
+        "wires": [
+            [
+                "http_mode_response"
+            ]
+        ]
+    },
+    {
+        "id": "http_mode_response",
+        "type": "http response",
+        "z": "tab_iot_monitor",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 620,
+        "y": 380,
+        "wires": []
+    },
+    {
+        "id": "http_mode_get_in",
+        "type": "http in",
+        "z": "tab_iot_monitor",
+        "name": "GET /api/mode",
+        "url": "/api/mode",
+        "method": "get",
+        "upload": false,
+        "skipBodyParsing": false,
+        "swaggerDoc": "",
+        "x": 150,
+        "y": 440,
+        "wires": [
+            [
+                "func_get_mode"
+            ]
+        ]
+    },
+    {
+        "id": "func_get_mode",
+        "type": "function",
+        "z": "tab_iot_monitor",
+        "name": "Get mode data",
+        "func": "const mode = flow.get(\"source_mode\") || \"simulation\";\nmsg.statusCode = 200;\nmsg.headers = { \"Content-Type\": \"application/json; charset=utf-8\", \"Cache-Control\": \"no-store\" };\nmsg.payload = { mode: mode };\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 370,
+        "y": 440,
+        "wires": [
+            [
+                "http_mode_get_response"
+            ]
+        ]
+    },
+    {
+        "id": "http_mode_get_response",
+        "type": "http response",
+        "z": "tab_iot_monitor",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 620,
+        "y": 440,
+        "wires": []
+    },
+    {
+        "id": "67a41a8a58cab8ad",
+        "type": "inject",
+        "z": "tab_iot_monitor",
+        "name": "Simulasi Inject DHT22",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "2",
+        "crontab": "",
+        "once": true,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"device_id\":\"ESP32-SIMULATOR\",\"temperature\":30.3,\"humidity\":65.5,\"rule_anomaly\":\"normal\",\"ai_score\":0.08,\"status\":\"normal\"}",
+        "payloadType": "json",
+        "x": 350,
+        "y": 160,
+        "wires": [
+            [
+                "store_iot_data"
+            ]
+        ]
+    }
+]
